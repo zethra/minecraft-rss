@@ -1,15 +1,13 @@
 #!/bin/bash
-REMOTE_HOST="192.168.1.1"
-USER="user"
+REMOTE_HOST="zethratech.com"
+USER="root"
 REMOTE_FILE="/var/www/html/rss.xml"
 KEY="key.pem"
 FILE="rss.xml"
+LOG_FILE="mc-rss.log"
 START="<!--list-start-->"
 END="<!--list-end-->"
 NOW=`date +"%a %b %d %l:%M:%S%P %Z %Y"`
-PLAYERS="0"
-CONTENT=""
-LIST="$START\n\t\t<guid>list</guid>\n\t\t<pubDate>$NOW</pubDate>\n\t\t<title>Players ($PLAYERS)</title>\n\t\t<description>\n$CONTENT\n\t\t</description>\n$END"
 
 init() {
 if [ -d $FILE ]; then
@@ -17,6 +15,13 @@ if [ -d $FILE ]; then
 fi
 if [ ! -f $FILE ] || [ -s $FILE ]; then 
 	echo -e "<rss>\n<channel>\n</channel>\n</rss>\n" > $FILE
+fi
+
+if [ -d $LOG_FILE ]; then
+	rm $LOG_FILE
+fi
+if [ ! -f $LOG_FILE ]; then 
+	touch $LOG_FILE
 fi
 }
 
@@ -33,18 +38,20 @@ XML="\t<item>\n\t\t<guid>$(uuidgen)</guid>\n\t\t<pubDate>$NOW</pubDate>\n\t\t\<t
 C=$(echo $XML | sed 's/\//\\\//g')
 sed "/<\/channel>/ s/.*/${C}\n&/" $FILE > tmp
 mv tmp $FILE
+echo "Event \"$TITLE\" added" >> $LOG_FILE
 }
 
 clearLog() {
 rm $FILE
 init
+echo "Log cleared" >> $LOG_FILE
 }
 
 push() {
-if [-f $FILE ]; then
-	scp -vCq -i $KEY $FILE $USER@$REMOTE_HOST:$REMOTE_FILE 
+if [ -e $FILE ] && [ -f $FILE ]; then
+	scp -vCq -i $KEY $FILE $USER@$REMOTE_HOST:$REMOTE_FILE 2>> $LOG_FILE
 else
-	echo "File does not exist"
+	echo "File does not exist" >> $LOG_FILE
 	exit -1
 fi
 }
