@@ -1,33 +1,23 @@
 #!/bin/bash
-NOW=`date +"%a %b %d %l:%M:%S%P %Z %Y"`
+REMOTE_HOST="192.168.1.1"
+USER="user"
+REMOTE_FILE="/var/www/html/rss.xml"
+KEY="key.pem"
 FILE="rss.xml"
 START="<!--list-start-->"
 END="<!--list-end-->"
+NOW=`date +"%a %b %d %l:%M:%S%P %Z %Y"`
 PLAYERS="0"
 CONTENT=""
 LIST="$START\n\t\t<guid>list</guid>\n\t\t<pubDate>$NOW</pubDate>\n\t\t<title>Players ($PLAYERS)</title>\n\t\t<description>\n$CONTENT\n\t\t</description>\n$END"
 
 init() {
-if [ ! -f $FILE ]; then 
-	touch $FILE
-	echo -e "<rss>\n<channel>\n\t<item>\n" >> $FILE
-	echo -e $LIST >> $FILE
-	echo -e "\n\t</item>\n</channel>\n</rss>\n" >> $FILE
+if [ -d $FILE ]; then
+	rm $FILE
 fi
-}
-
-players() {
-PLAYERS=$1
-INPUT=""
-while IFS= read -r LINE; do
-	INPUT=$LINE\\n$INPUT
-done
-INPUT=${INPUT%??}
-CONTENT=$(echo "\t\t\t$INPUT" | sed 's/\\n/\\n\\t\\t\\t/g')
-LIST="$START\n\t\t<guid>list</guid>\n\t\t<pubDate>$NOW</pubDate>\n\t\t<title>Players ($PLAYERS)</title>\n\t\t<description>\n$CONTENT\n\t\t</description>\n$END"
-C=$(echo $LIST | sed 's/\//\\\//g')
-sed -e "/${START}/,/${END}/c\\${C}" $FILE > tmp
-mv tmp $FILE
+if [ ! -f $FILE ] || [ -s $FILE ]; then 
+	echo -e "<rss>\n<channel>\n</channel>\n</rss>\n" > $FILE
+fi
 }
 
 add_event() {
@@ -46,21 +36,20 @@ mv tmp $FILE
 }
 
 clearLog() {
-sed -n '/<\/item>/q;p' $FILE > tmp
-echo -e "\n\t</item>\n</channel>\n</rss>\n" >> tmp
-mv tmp $FILE
+rm $FILE
+init
+}
+
+push() {
+if [-f $FILE ]; then
+	scp -vCq -i $KEY $FILE $USER@$REMOTE_HOST:$REMOTE_FILE 
+else
+	echo "File does not exist"
+	exit -1
+fi
 }
 
 case "$1" in
-players)
-if [ $# -gt 1 ]; then
-	init
-	shift
-	players "$*"
-else
-	echo "Must specify number of players"
-fi	
-;;
 add)
 if [ $# -gt 1 ]; then
 	init
@@ -73,8 +62,11 @@ fi
 clear)
 clearLog
 ;;
+push)
+push
+;;
 *)
-echo "Usage: $0 {players number_of_plyers|add title|clear}"
+echo "Usage: $0 {add \"title\"|clear|push}"
 exit 1
 ;;
 esac
